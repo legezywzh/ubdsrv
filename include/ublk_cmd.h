@@ -19,6 +19,8 @@
 #define	UBLK_CMD_GET_PARAMS	0x09
 #define	UBLK_CMD_START_USER_RECOVERY	0x10
 #define	UBLK_CMD_END_USER_RECOVERY	0x11
+#define	UBLK_CMD_REG_BPF_PROG		0x12
+#define	UBLK_CMD_UNREG_BPF_PROG		0x13
 /*
  * IO commands, issued by ublk server, and handled by ublk driver.
  *

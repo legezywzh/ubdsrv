@@ -4,7 +4,11 @@
 
 #include <poll.h>
 #include <sys/epoll.h>
+#include <linux/bpf.h>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 #include "ublksrv_tgt.h"
+#include "bpf/.tmp/ublk.skel.h"
 
 static bool backing_supports_discard(char *name)
 {
@@ -87,6 +91,47 @@ static int loop_recovery_tgt(struct ublksrv_dev *dev, int type)
 	tgt->fds[1] = fd;
 
 	return 0;
+}
+
+static int loop_init_bpf_prog(struct ublksrv_dev *dev,
+			      struct ublksrv_tgt_info *tgt)
+{
+	struct ublk_bpf *obj;
+	int i, ret, io_prep_fd, io_submit_fd;
+	struct ublksrv_ctrl_dev *cdev;
+	const struct ublksrv_ctrl_dev_info *info;
+
+	obj = ublk_bpf__open();
+	if (!obj) {
+		syslog(LOG_ERR, "failed to open BPF object\n");
+		return -1;
+	}
+	ret = ublk_bpf__load(obj);
+	if (ret) {
+		syslog(LOG_ERR, "failed to load BPF object\n");
+		return -1;
+	}
+
+	obj->data->target_fd = tgt->fds[1];
+	info = ublksrv_ctrl_get_dev_info(ublksrv_get_ctrl_dev(dev));
+	for (i = 0; i < info->nr_hw_queues; i++) {
+		const struct ublksrv_queue *q;
+		int val;
+
+		q = ublksrv_get_queue(dev, i);
+		val = q->ring_ptr->ring_fd;
+
+		ret = bpf_map_update_elem(bpf_map__fd(obj->maps.uring_fd_map), &i, &val, 0);
+		if (ret < 0)
+			return ret;
+	}
+	io_prep_fd = bpf_program__fd(obj->progs.ublk_io_prep_prog);
+	io_submit_fd = bpf_program__fd(obj->progs.ublk_io_submit_prog);
+
+	/* register bpf prog */
+	cdev = (struct ublksrv_ctrl_dev *)ublksrv_get_ctrl_dev(dev);
+	ret = ublksrv_ctrl_reg_bpf_prog(cdev, io_prep_fd, io_submit_fd);
+	return ret;
 }
 
 static int loop_init_tgt(struct ublksrv_dev *dev, int type, int argc, char
@@ -220,6 +265,11 @@ static int loop_init_tgt(struct ublksrv_dev *dev, int type, int argc, char
 			jbuf = ublksrv_tgt_realloc_json_buf(dev, &jbuf_size);
 	} while (ret < 0);
 
+	ret = loop_init_bpf_prog(dev, tgt);
+	if (ret < 0) {
+		syslog(LOG_ERR, "%s: loop_init_bpf_prog failed\n", __func__);
+		return -2;
+	}
 	return 0;
 }
 

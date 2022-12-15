@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 
 #include "ublksrv_priv.h"
 #include "ublksrv_aio.h"
@@ -546,7 +547,7 @@ const struct ublksrv_queue *ublksrv_queue_init(const struct ublksrv_dev *tdev,
 	q->q_depth = depth;
 	q->io_cmd_buf = NULL;
 	q->cmd_inflight = 0;
-	q->tid = gettid();
+	q->tid = syscall(SYS_gettid);
 
 	cmd_buf_size = ublksrv_queue_cmd_buf_sz(q);
 	off = UBLKSRV_CMD_BUF_OFFSET +

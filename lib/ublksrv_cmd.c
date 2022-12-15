@@ -9,6 +9,7 @@
 #define CTRL_CMD_HAS_DATA	1
 #define CTRL_CMD_HAS_BUF	2
 
+/*
 struct ublksrv_ctrl_cmd_data {
 	unsigned short cmd_op;
 	unsigned short flags;
@@ -17,6 +18,7 @@ struct ublksrv_ctrl_cmd_data {
 	__u64 addr;
 	__u32 len;
 };
+*/
 
 /*******************ctrl dev operation ********************************/
 static inline void ublksrv_ctrl_init_cmd(struct ublksrv_ctrl_dev *dev,
@@ -51,7 +53,7 @@ static inline void ublksrv_ctrl_init_cmd(struct ublksrv_ctrl_dev *dev,
 			dev->dev_info.dev_id, data->cmd_op, cmd);
 }
 
-static int __ublksrv_ctrl_cmd(struct ublksrv_ctrl_dev *dev,
+int __ublksrv_ctrl_cmd(struct ublksrv_ctrl_dev *dev,
 		struct ublksrv_ctrl_cmd_data *data)
 {
 	struct io_uring_sqe *sqe;
@@ -348,6 +350,22 @@ int ublksrv_ctrl_end_recovery(struct ublksrv_ctrl_dev *dev, int daemon_pid)
 	int ret;
 
 	dev->dev_info.ublksrv_pid = data.data[0] = daemon_pid;
+
+	ret = __ublksrv_ctrl_cmd(dev, &data);
+	return ret;
+}
+
+int ublksrv_ctrl_reg_bpf_prog(struct ublksrv_ctrl_dev *dev,
+		int io_prep_fd, int io_submit_fd)
+{
+	struct ublksrv_ctrl_cmd_data data = {
+		.cmd_op	= UBLK_CMD_REG_BPF_PROG,
+		.flags = 1,
+	};
+	int ret;
+
+	data.data[0] = io_prep_fd;
+	data.data[1] = io_submit_fd;
 
 	ret = __ublksrv_ctrl_cmd(dev, &data);
 	return ret;

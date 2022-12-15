@@ -12,7 +12,7 @@ script_dir="$(dirname ${BASH_SOURCE[0]})"
 autoreconf -i "${script_dir}"
 
 OPTS="-g -O0"
-: "${LIBURING_DIR:=/root/git/liburing}" #replace with your own liburing path
+: "${LIBURING_DIR:=/root/uring/}" #replace with your own liburing path
 PKG_CONFIG_PATH=${LIBURING_DIR} \
 ${script_dir}/configure \
   --enable-gcc-warnings \

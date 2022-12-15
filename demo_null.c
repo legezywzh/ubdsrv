@@ -10,6 +10,9 @@
 #include <errno.h>
 #include <error.h>
 #include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 #include "ublksrv.h"
 
@@ -53,7 +56,7 @@ static void *demo_null_io_handler_fn(void *data)
 
 	pthread_mutex_lock(&jbuf_lock);
 	ublksrv_json_write_queue_info(ublksrv_get_ctrl_dev(dev), jbuf, sizeof jbuf,
-			q_id, gettid());
+			q_id, syscall(SYS_gettid));
 	pthread_mutex_unlock(&jbuf_lock);
 	q = ublksrv_queue_init(dev, q_id, NULL);
 	if (!q) {
@@ -62,7 +65,7 @@ static void *demo_null_io_handler_fn(void *data)
 		return NULL;
 	}
 
-	fprintf(stdout, "tid %d: ublk dev %d queue %d started\n", gettid(),
+	fprintf(stdout, "tid %ld: ublk dev %d queue %d started\n", syscall(SYS_gettid),
 			dev_id, q->q_id);
 	do {
 		if (ublksrv_process_io(q) < 0)

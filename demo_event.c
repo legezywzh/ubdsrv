@@ -14,6 +14,9 @@
 #include <error.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
 
 #include "ublksrv.h"
 #include "ublksrv_aio.h"
@@ -241,8 +244,8 @@ static void *demo_event_uring_io_handler_fn(void *data)
 
 	ublksrv_aio_set_ctx_data(ctx, (void *)&ring);
 
-	fprintf(stdout, "ublk dev %d aio(io_uring submitter) context started tid %d\n",
-			dev_id, gettid());
+	fprintf(stdout, "ublk dev %d aio(io_uring submitter) context started tid %ld\n",
+			dev_id, syscall(SYS_gettid));
 
 	queue_event(ctx);
 	io_uring_submit_and_wait(&ring, 0);
@@ -284,8 +287,8 @@ static void *demo_event_real_io_handler_fn(void *data)
 	        return NULL;
 	}
 
-	fprintf(stdout, "ublk dev %d aio context(sync io submitter) started tid %d\n",
-			dev_id, gettid());
+	fprintf(stdout, "ublk dev %d aio context(sync io submitter) started tid %ld\n",
+			dev_id, syscall(SYS_gettid));
 
 	read_event.events = EPOLLIN;
 	read_event.data.fd = ctx_efd;
@@ -325,7 +328,7 @@ static void *demo_event_io_handler_fn(void *data)
 
 	pthread_mutex_lock(&jbuf_lock);
 	ublksrv_json_write_queue_info(ublksrv_get_ctrl_dev(dev), jbuf, sizeof jbuf,
-			q_id, gettid());
+			q_id, syscall(SYS_gettid));
 	pthread_mutex_unlock(&jbuf_lock);
 
 	q = ublksrv_queue_init(dev, q_id, info);
@@ -336,7 +339,7 @@ static void *demo_event_io_handler_fn(void *data)
 	}
 	info->q = q;
 
-	fprintf(stdout, "tid %d: ublk dev %d queue %d started\n", gettid(),
+	fprintf(stdout, "tid %ld: ublk dev %d queue %d started\n", syscall(SYS_gettid),
 			dev_id, q->q_id);
 	do {
 		if (ublksrv_process_io(q) < 0)

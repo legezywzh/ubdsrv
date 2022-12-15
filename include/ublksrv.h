@@ -34,6 +34,15 @@ struct io_uring_cqe;
 struct ublksrv_aio_ctx;
 struct ublksrv_ctrl_dev;
 
+struct ublksrv_ctrl_cmd_data {
+	unsigned short cmd_op;
+	unsigned short flags;
+
+	__u64 data[2];
+	__u64 addr;
+	__u32 len;
+};
+
 /*
  * Generic data for creating one ublk control device, which is used for
  * sending control commands to /dev/ublk-control.
@@ -305,6 +314,8 @@ extern void ublksrv_ctrl_prep_recovery(struct ublksrv_ctrl_dev *dev,
 		const char *recovery_jbuf);
 extern const char *ublksrv_ctrl_get_recovery_jbuf(const struct ublksrv_ctrl_dev *dev);
 
+extern int ublksrv_ctrl_reg_bpf_prog(struct ublksrv_ctrl_dev *dev,
+			int io_prep_fd, int io_submit_fd);
 /* ublksrv device ("/dev/ublkcN") level APIs */
 extern const struct ublksrv_dev *ublksrv_dev_init(const struct ublksrv_ctrl_dev *
 		ctrl_dev);
