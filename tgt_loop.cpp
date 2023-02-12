@@ -4,7 +4,11 @@
 
 #include <poll.h>
 #include <sys/epoll.h>
+#include <linux/bpf.h>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 #include "ublksrv_tgt.h"
+#include "bpf/.tmp/ublk.skel.h"
 
 static bool backing_supports_discard(char *name)
 {
@@ -88,6 +92,20 @@ static int loop_recovery_tgt(struct ublksrv_dev *dev, int type)
 	return 0;
 }
 
+static int loop_init_queue_bpf(const struct ublksrv_dev *dev,
+			       const struct ublksrv_queue *q)
+{
+	int ret, q_id, ring_fd;
+	const struct ublksrv_tgt_info *tgt = &dev->tgt;
+	struct ublk_bpf *obj = (struct ublk_bpf*)tgt->tgt_bpf_obj;
+
+	q_id = q->q_id;
+	ring_fd = q->ring_ptr->ring_fd;
+	ret = bpf_map_update_elem(bpf_map__fd(obj->maps.uring_fd_map), &q_id,
+				  &ring_fd,  0);
+	return ret;
+}
+
 static int loop_init_tgt(struct ublksrv_dev *dev, int type, int argc, char
 		*argv[])
 {
@@ -125,6 +143,7 @@ static int loop_init_tgt(struct ublksrv_dev *dev, int type, int argc, char
 		},
 	};
 	bool can_discard = false;
+	struct ublk_bpf *bpf_obj;
 
 	strcpy(tgt_json.name, "loop");
 
@@ -218,6 +237,10 @@ static int loop_init_tgt(struct ublksrv_dev *dev, int type, int argc, char
 			jbuf = ublksrv_tgt_realloc_json_buf(dev, &jbuf_size);
 	} while (ret < 0);
 
+	if (tgt->tgt_bpf_obj) {
+		bpf_obj = (struct ublk_bpf *)tgt->tgt_bpf_obj;
+		bpf_obj->data->target_fd = tgt->fds[1];
+	}
 	return 0;
 }
 
@@ -252,9 +275,14 @@ static int loop_queue_tgt_io(const struct ublksrv_queue *q,
 		const struct ublk_io_data *data, int tag)
 {
 	const struct ublksrv_io_desc *iod = data->iod;
-	struct io_uring_sqe *sqe = io_uring_get_sqe(q->ring_ptr);
+	struct io_uring_sqe *sqe;
 	unsigned ublk_op = ublksrv_get_op(iod);
 
+	/* ebpf prog wil handle read/write requests. */
+	if ((ublk_op == UBLK_IO_OP_READ) || (ublk_op == UBLK_IO_OP_WRITE))
+		return 1;
+
+	sqe = io_uring_get_sqe(q->ring_ptr);
 	if (!sqe)
 		return 0;
 
@@ -374,6 +402,7 @@ struct ublksrv_tgt_type  loop_tgt_type = {
 	.type	= UBLKSRV_TGT_TYPE_LOOP,
 	.name	=  "loop",
 	.recovery_tgt = loop_recovery_tgt,
+	.init_queue_bpf = loop_init_queue_bpf,
 };
 
 static void tgt_loop_init() __attribute__((constructor));

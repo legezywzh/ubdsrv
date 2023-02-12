@@ -106,6 +106,7 @@ struct ublksrv_tgt_info {
 	unsigned int nr_fds;
 	int fds[UBLKSRV_TGT_MAX_FDS];
 	void *tgt_data;
+	void *tgt_bpf_obj;
 
 	/*
 	 * Extra IO slots for each queue, target code can reserve some
@@ -263,6 +264,8 @@ struct ublksrv_tgt_type {
 	int (*init_queue)(const struct ublksrv_queue *, void **queue_data_ptr);
 	void (*deinit_queue)(const struct ublksrv_queue *);
 
+	int (*init_queue_bpf)(const struct ublksrv_dev *dev, const struct ublksrv_queue *q);
+
 	unsigned long reserved[5];
 };
 
@@ -317,6 +320,11 @@ extern void ublksrv_ctrl_prep_recovery(struct ublksrv_ctrl_dev *dev,
 		const char *tgt_type, const struct ublksrv_tgt_type *tgt_ops,
 		const char *recovery_jbuf);
 extern const char *ublksrv_ctrl_get_recovery_jbuf(const struct ublksrv_ctrl_dev *dev);
+
+extern void ublksrv_ctrl_set_bpf_obj_info(struct ublksrv_ctrl_dev *dev,
+					  void *obj);
+extern int ublksrv_ctrl_reg_bpf_prog(struct ublksrv_ctrl_dev *dev,
+				     int io_prep_fd, int io_submit_fd);
 
 /* ublksrv device ("/dev/ublkcN") level APIs */
 extern const struct ublksrv_dev *ublksrv_dev_init(const struct ublksrv_ctrl_dev *

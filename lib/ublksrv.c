@@ -603,6 +603,9 @@ skip_alloc_buf:
 		goto fail;
 	}
 
+	if (dev->tgt.ops->init_queue_bpf)
+		dev->tgt.ops->init_queue_bpf(tdev, local_to_tq(q));
+
 	ublksrv_dev_init_io_cmds(dev, q);
 
 	/*
@@ -723,6 +726,7 @@ const struct ublksrv_dev *ublksrv_dev_init(const struct ublksrv_ctrl_dev *ctrl_d
 	}
 
 	tgt->fds[0] = dev->cdev_fd;
+	tgt->tgt_bpf_obj = ctrl_dev->bpf_obj;
 
 	ret = ublksrv_tgt_init(dev, ctrl_dev->tgt_type, ctrl_dev->tgt_ops,
 			ctrl_dev->tgt_argc, ctrl_dev->tgt_argv);

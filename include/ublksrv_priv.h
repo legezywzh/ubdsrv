@@ -42,6 +42,7 @@ struct ublksrv_ctrl_dev {
 
 	const char *tgt_type;
 	const struct ublksrv_tgt_type *tgt_ops;
+	void *bpf_obj;
 
 	/*
 	 * default is UBLKSRV_RUN_DIR but can be specified via command line,

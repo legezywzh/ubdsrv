@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "ublksrv_tgt.h"
+#include "bpf/.tmp/ublk.skel.h"
 
 /* per-task variable */
 static pthread_mutex_t jbuf_lock;
@@ -575,6 +576,31 @@ static void ublksrv_tgt_set_params(struct ublksrv_ctrl_dev *cdev,
 	}
 }
 
+static int ublksrv_tgt_load_bpf_prog(struct ublksrv_ctrl_dev *cdev)
+{
+	struct ublk_bpf *obj;
+	int ret, io_prep_fd, io_submit_fd;
+
+	obj = ublk_bpf__open();
+	if (!obj) {
+		fprintf(stderr, "failed to open BPF object\n");
+		return -1;
+	}
+	ret = ublk_bpf__load(obj);
+	if (ret) {
+		fprintf(stderr, "failed to load BPF object\n");
+		return -1;
+	}
+
+
+	io_prep_fd = bpf_program__fd(obj->progs.ublk_io_prep_prog);
+	io_submit_fd = bpf_program__fd(obj->progs.ublk_io_submit_prog);
+	ret = ublksrv_ctrl_reg_bpf_prog(cdev, io_prep_fd, io_submit_fd);
+	if (!ret)
+		ublksrv_ctrl_set_bpf_obj_info(cdev, obj);
+	return ret;
+}
+
 static int cmd_dev_add(int argc, char *argv[])
 {
 	static const struct option longopts[] = {
@@ -694,6 +720,13 @@ static int cmd_dev_add(int argc, char *argv[])
 	if (ret < 0) {
 		fprintf(stderr, "can't add dev %d, ret %d\n", data.dev_id, ret);
 		goto fail;
+	}
+
+	ret = ublksrv_tgt_load_bpf_prog(dev);
+	if (ret < 0) {
+		fprintf(stderr, "dev %d load bpf prog failed, ret %d\n",
+			data.dev_id, ret);
+		goto fail_stop_daemon;
 	}
 
 	{

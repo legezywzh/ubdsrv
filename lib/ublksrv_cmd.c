@@ -502,6 +502,27 @@ int ublksrv_ctrl_end_recovery(struct ublksrv_ctrl_dev *dev, int daemon_pid)
 	return ret;
 }
 
+int ublksrv_ctrl_reg_bpf_prog(struct ublksrv_ctrl_dev *dev,
+			      int io_prep_fd, int io_submit_fd)
+{
+	struct ublksrv_ctrl_cmd_data data = {
+		.cmd_op = UBLK_CMD_REG_BPF_PROG,
+		.flags = CTRL_CMD_HAS_DATA,
+	};
+	int ret;
+
+	data.data[0] = io_prep_fd;
+	data.data[1] = io_submit_fd;
+
+	ret = __ublksrv_ctrl_cmd(dev, &data);
+	return ret;
+}
+
+void ublksrv_ctrl_set_bpf_obj_info(struct ublksrv_ctrl_dev *dev,  void *obj)
+{
+	dev->bpf_obj = obj;
+}
+
 const struct ublksrv_ctrl_dev_info *ublksrv_ctrl_get_dev_info(
 		const struct ublksrv_ctrl_dev *dev)
 {
